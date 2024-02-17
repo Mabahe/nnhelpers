@@ -7,6 +7,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Session\UserSession;
+use TYPO3\CMS\Core\Http\NormalizedParams;
+use TYPO3\CMS\Core\Http\CookieScopeTrait;
 
 use Firebase\JWT\JWT;
 use TYPO3\CMS\Core\Security\JwtTrait;
@@ -15,7 +17,13 @@ use TYPO3\CMS\Core\Session\UserSessionManager;
 class FrontendUser implements SingletonInterface 
 {
 	use JwtTrait;
+	use CookieScopeTrait;
 
+	/**
+	 * needed by CookieScopeTrait
+	 */
+	protected string $loginType = 'FE';
+	
 	/**
 	 * lokaler Cache
 	 */
@@ -241,15 +249,17 @@ class FrontendUser implements SingletonInterface
 	 * @param ServerRequest $request
 	 * @return boolean
 	 */
-	public function isLoggedIn( $request = null ) {
-
+	public function isLoggedIn( $request = null ) 
+	{
 		if ($request) {
 			$cookieName = $this->getCookieName();
 			$jwt = $request->getCookieParams()[$cookieName] ?? false;
 			$identifier = false;
 			if ($jwt) {
 				try {
-					$identifier = \TYPO3\CMS\Core\Session\UserSession::resolveIdentifierFromJwt($jwt);
+					$params = $request->getAttribute('normalizedParams') ?? NormalizedParams::createFromRequest($request);
+					$cookieScope = $this->getCookieScope( $params );
+					$identifier = \TYPO3\CMS\Core\Session\UserSession::resolveIdentifierFromJwt($jwt, $cookieScope);
 				} catch( \Exception $e ) {}
 			}
 			if ($identifier) return true;
