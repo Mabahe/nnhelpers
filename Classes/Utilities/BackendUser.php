@@ -8,11 +8,25 @@ use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Http\ServerRequest;
 
+use TYPO3\CMS\Core\Http\NormalizedParams;
+use TYPO3\CMS\Core\Http\CookieScopeTrait;
+
+use TYPO3\CMS\Core\Security\JwtTrait;
+use TYPO3\CMS\Core\Session\UserSessionManager;
+
 /**
  * 	Methoden, um im Frontend zu prüfen, ob ein User im Typo3-Backend eingeloggt ist und z.B. Admin-Rechte besitzt.
  * 	Methoden, um einen Backend-User zu starten, falls er nicht existiert (z.B. während eines Scheduler-Jobs).
  */
-class BackendUser implements SingletonInterface {
+class BackendUser implements SingletonInterface 
+{
+	use JwtTrait;
+	use CookieScopeTrait;
+
+	/**
+	 * needed by CookieScopeTrait
+	 */
+	protected string $loginType = 'BE';
 
 	/**
 	 * Prüft, ob ein BE-User eingeloggt ist.
@@ -36,7 +50,9 @@ class BackendUser implements SingletonInterface {
 			$identifier = false;
 			if ($jwt) {
 				try {
-					$identifier = \TYPO3\CMS\Core\Session\UserSession::resolveIdentifierFromJwt($jwt);
+					$params = $request->getAttribute('normalizedParams') ?? NormalizedParams::createFromRequest($request);
+					$cookieScope = $this->getCookieScope( $params );
+					$identifier = \TYPO3\CMS\Core\Session\UserSession::resolveIdentifierFromJwt($jwt, $cookieScope);
 				} catch( \Exception $e ) {}
 			}
 			if ($identifier) return true;
